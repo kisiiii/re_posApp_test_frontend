@@ -41,10 +41,26 @@ export default function Home() {
       return;
     }
 
+    // 環境変数が設定されているかチェック
+    if (!process.env.NEXT_PUBLIC_API_URL) {
+      console.error("API URLが設定されていません");
+      setMessage("API URLが設定されていません");
+      return;
+    }
+
     try {
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/product/${barcode}`
+        `${process.env.NEXT_PUBLIC_API_URL}/product/${barcode}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          mode: "cors", // CORSモードを明示
+        }
       );
+
       const data = await response.json();
 
       if (response.ok) {
