@@ -41,10 +41,14 @@ export default function Home() {
       return;
     }
 
+    // API URLの末尾にスラッシュがある場合に削除
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL.endsWith("/")
+      ? process.env.NEXT_PUBLIC_API_URL.slice(0, -1)
+      : process.env.NEXT_PUBLIC_API_URL;
+
     try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/product/${barcode}`
-      );
+      // API URLとバーコードを組み立ててフェッチを実行
+      const response = await fetch(`${apiUrl}/product/${barcode}`);
       const data = await response.json();
 
       if (response.ok) {
