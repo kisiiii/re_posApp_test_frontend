@@ -1,6 +1,3 @@
-# Docs for the Azure Web Apps Deploy action: https://github.com/Azure/webapps-deploy
-# More GitHub Actions for Azure: https://github.com/Azure/actions
-
 name: Build and deploy Node.js app to Azure Web App - tech0-gen-7-step4-studentwebapp-pos-29
 
 on:
@@ -21,13 +18,20 @@ jobs:
         with:
           node-version: "20.x"
 
+      # 環境変数を設定する
+      - name: Set environment variables
+        run: |
+          echo "NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }}" >> $GITHUB_ENV
+
       - name: npm install, build, and test
+        env:
+          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }} # GitHub Secretsから環境変数を渡す
         run: |
           npm install
           npm run build --if-present
           npm run test --if-present
 
-      - name: Copy artifact for deployment job # 変更点➀
+      - name: Copy artifact for deployment job
         run: |
           mkdir deploy
           if [ -d ".next/standalone/" ]; then cp -r ./.next/standalone/. ./deploy; fi
@@ -35,7 +39,7 @@ jobs:
           if [ -d ".next/static/" ]; then cp -r ./.next/static/. ./deploy/.next/static; fi
 
       - name: Zip artifact for deployment
-        run: zip release.zip ./deploy -r # 変更点➁
+        run: zip release.zip ./deploy -r
 
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4
@@ -65,5 +69,5 @@ jobs:
         with:
           app-name: "tech0-gen-7-step4-studentwebapp-pos-29"
           slot-name: "Production"
-          package: ./deploy # 変更点➂
+          package: ./deploy
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_851A6C4DB93146FBBAC3C1019A0FFF78 }}
