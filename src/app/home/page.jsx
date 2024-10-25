@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
+import { BrowserMultiFormatReader } from "@zxing/library";
 
 export default function Home() {
   const [barcode, setBarcode] = useState("");
@@ -8,17 +9,34 @@ export default function Home() {
   const [price, setPrice] = useState("");
   const [message, setMessage] = useState("");
   const [cart, setCart] = useState([]);
-  const [stream, setStream] = useState(null); // ストリームを保存するための状態
+  const [stream, setStream] = useState(null);
   const videoRef = useRef(null);
+  const [scanning, setScanning] = useState(false); // スキャン中の状態管理
 
-  // カメラを起動して映像を表示
+  const codeReader = new BrowserMultiFormatReader();
+
+  // カメラを起動してバーコードをスキャン
   const handleScanClick = async () => {
     try {
       const videoStream = await navigator.mediaDevices.getUserMedia({
         video: true,
       });
       videoRef.current.srcObject = videoStream;
-      setStream(videoStream); // ストリームを保存
+      setStream(videoStream);
+      setScanning(true); // スキャン開始
+
+      // 一度だけバーコードを読み取る
+      codeReader
+        .decodeOnceFromVideoDevice(null, videoRef.current)
+        .then((result) => {
+          if (result) {
+            setBarcode(result.getText()); // バーコードをセット
+            handleStopScanClick(); // カメラを停止
+          }
+        })
+        .catch((err) => {
+          console.error("バーコードの読み取りに失敗しました:", err);
+        });
     } catch (err) {
       console.error("カメラの起動に失敗しました:", err);
       setMessage("カメラの起動に失敗しました");
@@ -28,20 +46,20 @@ export default function Home() {
   // カメラのストリームを停止
   const handleStopScanClick = () => {
     if (stream) {
-      stream.getTracks().forEach((track) => track.stop()); // ストリームを停止
-      setStream(null); // ストリームをリセット
-      videoRef.current.srcObject = null; // カメラ映像を停止
+      stream.getTracks().forEach((track) => track.stop());
+      setStream(null);
+      videoRef.current.srcObject = null;
     }
+    setScanning(false); // スキャン停止
   };
 
-  // 手動入力されたバーコードを使用して商品情報を取得
+  // 手動入力またはスキャンで取得したバーコードを使用して商品情報を取得
   const handleBarcodeInput = async () => {
     if (!barcode) {
-      setMessage("バーコードを入力してください");
+      setMessage("バーコードを入力またはスキャンしてください");
       return;
     }
 
-    // 環境変数が設定されているかチェック
     if (!process.env.NEXT_PUBLIC_API_URL) {
       console.error("API URLが設定されていません");
       setMessage("API URLが設定されていません");
@@ -57,7 +75,7 @@ export default function Home() {
             "Content-Type": "application/json",
             Accept: "application/json",
           },
-          mode: "cors", // CORSモードを明示
+          mode: "cors",
         }
       );
 
@@ -88,7 +106,6 @@ export default function Home() {
 
     setCart([...cart, newProduct]);
 
-    // 入力をクリア
     setBarcode("");
     setProductName("");
     setPrice("");
@@ -102,7 +119,7 @@ export default function Home() {
   // 購入処理
   const handlePurchaseClick = async () => {
     const totalAmt = calculateTotal();
-    const totalAmtExTax = Math.round(totalAmt * 1.1); // 税込み金額を計算
+    const totalAmtExTax = Math.round(totalAmt * 1.1);
 
     try {
       const response = await fetch(
@@ -113,9 +130,9 @@ export default function Home() {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            cart, // 購入リストの商品情報
-            totalAmt, // 合計金額（税抜）
-            totalAmtExTax, // 合計金額（税込）
+            cart,
+            totalAmt,
+            totalAmtExTax,
           }),
         }
       );
@@ -126,7 +143,7 @@ export default function Home() {
         alert(
           `合計金額（税抜）: ${data.totalAmt}円\n合計金額（税込）: ${data.totalAmtExTax}円\n購入が完了しました！`
         );
-        setCart([]); // 購入リストをリセット
+        setCart([]);
       } else {
         setMessage("購入処理に失敗しました");
       }
@@ -155,12 +172,10 @@ export default function Home() {
 
   return (
     <div style={{ padding: "20px", fontFamily: "Arial, sans-serif" }}>
-      {/* ①カメラスキャンボタン */}
       <div style={{ textAlign: "center", marginBottom: "20px" }}>
         <button onClick={handleScanClick} style={buttonStyle}>
           スキャン（カメラ）
         </button>
-        {/* カメラが起動している場合のみ停止ボタンを表示 */}
         {stream && (
           <button onClick={handleStopScanClick} style={buttonStyle}>
             カメラを停止
@@ -168,7 +183,6 @@ export default function Home() {
         )}
       </div>
 
-      {/* カメラ映像の表示 */}
       <div>
         <video
           ref={videoRef}
@@ -177,7 +191,6 @@ export default function Home() {
         />
       </div>
 
-      {/* ②バーコード手入力フィールド */}
       <input
         type="text"
         value={barcode}
@@ -186,12 +199,10 @@ export default function Home() {
         style={inputStyle}
       />
 
-      {/* ③商品取得ボタン */}
       <button onClick={handleBarcodeInput} style={buttonStyle}>
         商品を取得
       </button>
 
-      {/* ④取得された商品情報の表示 */}
       {productName && (
         <div>
           <p>名称: {productName}</p>
@@ -199,19 +210,15 @@ export default function Home() {
         </div>
       )}
 
-      {/* エラーメッセージの表示 */}
       {message && <p>{message}</p>}
 
-      {/* ⑤購入リストへ追加ボタン */}
       <button onClick={handleAddToCart} style={buttonStyle}>
         追加
       </button>
 
-      {/* ⑥購入品目リスト */}
       <h3>購入リスト</h3>
       <div style={listStyle}>{renderCartItems()}</div>
 
-      {/* ⑦購入ボタン */}
       <button onClick={handlePurchaseClick} style={buttonStyle}>
         購入
       </button>
@@ -219,7 +226,6 @@ export default function Home() {
   );
 }
 
-// ボタンのスタイル
 const buttonStyle = {
   backgroundColor: "#ADD8E6",
   padding: "10px 20px",
@@ -230,7 +236,6 @@ const buttonStyle = {
   width: "100%",
 };
 
-// 入力フィールドのスタイル
 const inputStyle = {
   border: "1px solid #ccc",
   padding: "10px",
@@ -239,7 +244,6 @@ const inputStyle = {
   display: "block",
 };
 
-// リストのスタイル
 const listStyle = {
   border: "1px solid #ccc",
   padding: "10px",
